@@ -1,0 +1,3 @@
+#!/bin/bash
+# Wrapper script for Lisp JAR decompiler
+exec sbcl --script /home/kimkimjp/jar-decompiler.lisp "$@"

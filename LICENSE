@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 kimkimjp
+Copyright (c) 2024 JAR Decompiler Tool Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,24 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Third-party Software Licenses:
+
+This tool uses the following third-party decompilers:
+
+1. CFR (Class File Reader)
+   Copyright (c) Lee Benfield
+   License: MIT
+   https://github.com/leibnitz27/cfr
+
+2. Fernflower
+   Copyright (c) JetBrains s.r.o.
+   License: Apache License 2.0
+   https://github.com/fesh0r/fernflower
+
+3. Procyon
+   Copyright (c) Mike Strobel
+   License: Apache License 2.0
+   https://github.com/mstrobel/procyon

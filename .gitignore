@@ -1,0 +1,34 @@
+# Decompiler tools (will be downloaded)
+decompiler-tools/
+*.jar
+
+# Output directories
+*_src/
+*_test/
+*_output/
+
+# Class files
+*.class
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.orig
+
+# Log files
+*.log
+
+# SBCL fasls
+*.fasl
+*.lisp-temp
