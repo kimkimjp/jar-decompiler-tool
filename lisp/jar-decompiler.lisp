@@ -23,27 +23,29 @@
   (format-color t 33 (format nil "[WARNING] ~A" message))
   (terpri))
 
-;;; System command execution
-(defun run-shell-command (command &key ignore-errors)
-  "Execute shell command and return exit code"
-  (let ((exit-code (sb-ext:process-exit-code
-                    (sb-ext:run-program "/bin/sh"
-                                       (list "-c" command)
-                                       :output t
-                                       :error t
-                                       :wait t))))
+;;; System command execution (safe, no shell interpretation)
+(defun run-program-safe (program args &key directory ignore-errors (output t) (error-output t))
+  "Run a program with arguments safely (no shell interpretation)"
+  (let* ((process (sb-ext:run-program program args
+                    :directory directory
+                    :output output
+                    :error error-output
+                    :search t
+                    :wait t))
+         (exit-code (sb-ext:process-exit-code process)))
     (unless (or ignore-errors (zerop exit-code))
-      (error "Command failed: ~A (exit code: ~A)" command exit-code))
+      (error "Command failed: ~A ~A (exit code: ~A)" program args exit-code))
     exit-code))
 
-(defun run-shell-silent (command)
-  "Execute shell command silently"
-  (sb-ext:process-exit-code
-   (sb-ext:run-program "/bin/sh"
-                      (list "-c" command)
-                      :output nil
-                      :error nil
-                      :wait t)))
+(defun run-program-output (program args &key directory)
+  "Run a program and capture its stdout as a string"
+  (with-output-to-string (stream)
+    (sb-ext:run-program program args
+                       :directory directory
+                       :output stream
+                       :error nil
+                       :search t
+                       :wait t)))
 
 (defun file-exists-p (path)
   "Check if file exists"
@@ -54,7 +56,7 @@
   (ensure-directories-exist (concatenate 'string path "/")))
 
 ;;; Configuration
-(defparameter *decompiler-dir* "/home/kimkimjp/decompiler-tools/")
+(defparameter *decompiler-dir* (namestring (merge-pathnames "decompiler-tools/" (user-homedir-pathname))))
 (defparameter *decompilers*
   '((:cfr         . ("cfr.jar"
                     "https://github.com/leibnitz27/cfr/releases/download/0.152/cfr-0.152.jar"))
@@ -82,7 +84,7 @@
     (when (and jar-path url (not (file-exists-p jar-path)))
       (print-warning (format nil "~A not found. Downloading..." type))
       (ensure-dir *decompiler-dir*)
-      (run-shell-command (format nil "wget -q '~A' -O '~A'" url jar-path))
+      (run-program-safe "wget" (list "-q" url "-O" jar-path))
       (print-success (format nil "~A downloaded successfully" type)))))
 
 ;;; JAR operations
@@ -91,19 +93,18 @@
   (print-info (format nil "Extracting JAR file: ~A" jar-path))
   (ensure-dir output-dir)
   (let ((abs-jar (namestring (truename jar-path))))
-    (run-shell-command
-     (format nil "cd '~A' && jar xf '~A' 2>/dev/null || unzip -q '~A'"
-             output-dir abs-jar abs-jar)))
+    (let ((exit-code (run-program-safe "jar" (list "xf" abs-jar)
+                                       :directory output-dir
+                                       :ignore-errors t
+                                       :error-output nil)))
+      (unless (zerop exit-code)
+        (run-program-safe "unzip" (list "-q" abs-jar)
+                          :directory output-dir))))
   (print-success "JAR file extracted"))
 
 (defun find-class-files (directory)
   "Find all .class files in directory"
-  (let* ((command (format nil "find '~A' -name '*.class' -type f" directory))
-         (output (with-output-to-string (stream)
-                   (sb-ext:run-program "/bin/sh"
-                                      (list "-c" command)
-                                      :output stream
-                                      :wait t))))
+  (let ((output (run-program-output "find" (list directory "-name" "*.class" "-type" "f"))))
     (with-input-from-string (s output)
       (loop for line = (read-line s nil nil)
             while line
@@ -112,50 +113,51 @@
 
 (defun count-files (directory extension)
   "Count files with given extension in directory"
-  (let ((command (format nil "find '~A' -name '*.~A' -type f | wc -l" directory extension)))
-    (parse-integer
-     (with-output-to-string (s)
-       (sb-ext:run-program "/bin/sh"
-                          (list "-c" command)
-                          :output s
-                          :wait t))
-     :junk-allowed t)))
+  (let ((output (run-program-output "find"
+                  (list directory "-name" (format nil "*.~A" extension) "-type" "f"))))
+    (length (remove-if (lambda (line) (string= line ""))
+                       (with-input-from-string (s output)
+                         (loop for line = (read-line s nil nil)
+                               while line collect line))))))
 
 ;;; Decompilation
 (defun decompile-with-cfr (class-file java-file)
   "Decompile single class file with CFR"
   (let ((jar-path (get-decompiler-jar-path :cfr)))
-    (run-shell-silent
-     (format nil "java -jar '~A' '~A' > '~A' 2>/dev/null"
-             jar-path class-file java-file))))
+    (with-open-file (out java-file :direction :output :if-exists :supersede)
+      (sb-ext:run-program "java" (list "-jar" jar-path class-file)
+                         :output out
+                         :error nil
+                         :search t
+                         :wait t))))
 
 (defun decompile-with-procyon (class-file java-file)
   "Decompile single class file with Procyon"
   (let ((jar-path (get-decompiler-jar-path :procyon)))
-    (run-shell-silent
-     (format nil "java -jar '~A' '~A' > '~A' 2>/dev/null"
-             jar-path class-file java-file))))
+    (with-open-file (out java-file :direction :output :if-exists :supersede)
+      (sb-ext:run-program "java" (list "-jar" jar-path class-file)
+                         :output out
+                         :error nil
+                         :search t
+                         :wait t))))
 
 (defun decompile-with-fernflower (jar-file output-dir)
   "Decompile entire JAR with Fernflower"
   (let ((jar-path (get-decompiler-jar-path :fernflower))
         (temp-dir (concatenate 'string output-dir "/fernflower-temp")))
     (ensure-dir temp-dir)
-    (run-shell-command
-     (format nil "java -jar '~A' -dgs=1 '~A' '~A' 2>/dev/null"
-             jar-path jar-file temp-dir)
-     :ignore-errors t)
+    (run-program-safe "java" (list "-jar" jar-path "-dgs=1" jar-file temp-dir)
+                      :ignore-errors t :error-output nil)
     ;; Extract the decompiled JAR
     (let ((decompiled-jar (format nil "~A/~A" temp-dir (file-namestring jar-file))))
       (when (file-exists-p decompiled-jar)
-        (run-shell-command
-         (format nil "cd '~A' && jar xf '~A' 2>/dev/null" temp-dir decompiled-jar))
-        (run-shell-command (format nil "rm '~A'" decompiled-jar))
+        (run-program-safe "jar" (list "xf" (namestring (truename decompiled-jar)))
+                          :directory temp-dir :error-output nil :ignore-errors t)
+        (delete-file decompiled-jar)
         ;; Move files to output dir
-        (run-shell-command
-         (format nil "cp -r '~A'/* '~A'/ 2>/dev/null" temp-dir output-dir)
-         :ignore-errors t)
-        (run-shell-command (format nil "rm -rf '~A'" temp-dir))))))
+        (run-program-safe "cp" (list "-r" "-T" temp-dir output-dir)
+                          :ignore-errors t)
+        (run-program-safe "rm" (list "-rf" temp-dir))))))
 
 (defun decompile-classes (output-dir decompiler-type jar-file &key verbose keep-class)
   "Decompile all class files in directory"
@@ -192,7 +194,7 @@
     ;; Remove class files if requested
     (unless keep-class
       (print-info "Removing .class files...")
-      (run-shell-command (format nil "find '~A' -name '*.class' -type f -delete" output-dir))
+      (run-program-safe "find" (list output-dir "-name" "*.class" "-type" "f" "-delete"))
       (print-success ".class files removed"))))
 
 ;;; Main function

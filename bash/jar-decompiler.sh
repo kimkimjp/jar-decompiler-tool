@@ -143,10 +143,10 @@ print_info "Found $CLASS_COUNT class files"
 case $DECOMPILER in
     cfr)
         # Check if CFR is available
-        CFR_JAR="/home/kimkimjp/decompiler-tools/cfr.jar"
+        CFR_JAR="$HOME/decompiler-tools/cfr.jar"
         if [ ! -f "$CFR_JAR" ]; then
             print_warning "CFR not found. Downloading..."
-            mkdir -p /home/kimkimjp/decompiler-tools
+            mkdir -p "$HOME/decompiler-tools"
             wget -q "https://github.com/leibnitz27/cfr/releases/download/0.152/cfr-0.152.jar" -O "$CFR_JAR" || {
                 print_error "Failed to download CFR"
                 exit 1
@@ -156,7 +156,7 @@ case $DECOMPILER in
 
         print_info "Decompiling with CFR..."
         # Process each class file
-        for CLASS_FILE in $CLASS_FILES; do
+        while IFS= read -r -d '' CLASS_FILE; do
             if [ "$VERBOSE" = true ]; then
                 echo "  Decompiling: $CLASS_FILE"
             fi
@@ -168,15 +168,15 @@ case $DECOMPILER in
             java -jar "$CFR_JAR" "$CLASS_FILE" > "${DIR}/${BASENAME}.java" 2>/dev/null || {
                 print_warning "Failed to decompile: $CLASS_FILE"
             }
-        done
+        done < <(find "$OUTPUT_DIR" -name "*.class" -type f -print0)
         ;;
 
     fernflower)
         # Check if Fernflower is available
-        FERNFLOWER_JAR="/home/kimkimjp/decompiler-tools/fernflower.jar"
+        FERNFLOWER_JAR="$HOME/decompiler-tools/fernflower.jar"
         if [ ! -f "$FERNFLOWER_JAR" ]; then
             print_warning "Fernflower not found. Downloading..."
-            mkdir -p /home/kimkimjp/decompiler-tools
+            mkdir -p "$HOME/decompiler-tools"
             wget -q "https://github.com/fesh0r/fernflower/releases/download/v1.1.1/fernflower-1.1.1.jar" -O "$FERNFLOWER_JAR" || {
                 print_error "Failed to download Fernflower"
                 exit 1
@@ -191,12 +191,12 @@ case $DECOMPILER in
         }
 
         # Extract the decompiled JAR
-        if [ -f "$OUTPUT_DIR/decompiled/$(basename $JAR_FILE)" ]; then
+        if [ -f "$OUTPUT_DIR/decompiled/$(basename "$JAR_FILE")" ]; then
             cd "$OUTPUT_DIR/decompiled"
-            jar xf "$(basename $JAR_FILE)" 2>/dev/null || unzip -q "$(basename $JAR_FILE)" 2>/dev/null
-            rm "$(basename $JAR_FILE)"
+            jar xf "$(basename "$JAR_FILE")" 2>/dev/null || unzip -q "$(basename "$JAR_FILE")" 2>/dev/null
+            rm "$(basename "$JAR_FILE")"
             # Move decompiled files to main output directory
-            cp -r * ../ 2>/dev/null
+            cp -r ./* ../ 2>/dev/null
             cd ..
             rm -rf decompiled
         fi
@@ -204,10 +204,10 @@ case $DECOMPILER in
 
     procyon)
         # Check if Procyon is available
-        PROCYON_JAR="/home/kimkimjp/decompiler-tools/procyon.jar"
+        PROCYON_JAR="$HOME/decompiler-tools/procyon.jar"
         if [ ! -f "$PROCYON_JAR" ]; then
             print_warning "Procyon not found. Downloading..."
-            mkdir -p /home/kimkimjp/decompiler-tools
+            mkdir -p "$HOME/decompiler-tools"
             wget -q "https://github.com/mstrobel/procyon/releases/download/v0.6.0/procyon-decompiler-0.6.0.jar" -O "$PROCYON_JAR" || {
                 print_error "Failed to download Procyon"
                 exit 1
@@ -217,7 +217,7 @@ case $DECOMPILER in
 
         print_info "Decompiling with Procyon..."
         # Process each class file
-        for CLASS_FILE in $CLASS_FILES; do
+        while IFS= read -r -d '' CLASS_FILE; do
             if [ "$VERBOSE" = true ]; then
                 echo "  Decompiling: $CLASS_FILE"
             fi
@@ -229,7 +229,7 @@ case $DECOMPILER in
             java -jar "$PROCYON_JAR" "$CLASS_FILE" > "${DIR}/${BASENAME}.java" 2>/dev/null || {
                 print_warning "Failed to decompile: $CLASS_FILE"
             }
-        done
+        done < <(find "$OUTPUT_DIR" -name "*.class" -type f -print0)
         ;;
 
     *)

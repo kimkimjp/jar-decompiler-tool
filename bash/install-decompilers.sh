@@ -30,7 +30,7 @@ print_warning() {
 }
 
 # Installation directory
-INSTALL_DIR="/home/kimkimjp/decompiler-tools"
+INSTALL_DIR="$HOME/decompiler-tools"
 
 print_info "Java Decompiler Tools Installer"
 print_info "================================"
